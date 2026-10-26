@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#d6e7ee" />
+    <title>日本 3D 旅遊導覽</title>
+    <meta name="description" content="用 3D 地圖漫遊日本 47 都道府縣，點選就會立起當地地標的立體模型。" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <script>
+      // 入口の保険: main.js(と import しているモジュール)が読めない・初期化に失敗したときに、文字の案内を出す
+      (function () {
+        var shown = false;
+        window.__bootFail = function (why) {
+          if (shown || document.documentElement.getAttribute("data-ready")) return;
+          shown = true;
+          var box = document.getElementById("boot-error"), msg = document.getElementById("boot-error-msg"), boot = document.getElementById("boot");
+          if (boot) boot.hidden = true;
+          if (msg) msg.textContent = why === "slow" ? "地圖載入時間較長，可能是網路較慢。" : "地圖沒有順利啟動（" + why + "）。";
+          if (box) box.hidden = false;
+        };
+        window.addEventListener("error", function (e) {
+          var t = e.target;
+          if (t && t.tagName === "SCRIPT") window.__bootFail("程式檔載入失敗");
+          // 模組を読み込んだあと、起動の合図より前に止まった(資料の読み込みエラーなど)
+          else if (t === window && !document.documentElement.getAttribute("data-ready")) setTimeout(function () { window.__bootFail("初始化錯誤"); }, 0);
+        }, true);
+        setTimeout(function () { window.__bootFail("slow"); }, 20000);
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/main-vg2f8KiK.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/models-CT3aOBjJ.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-CtqE5uAm.css">
+  </head>
+  <body>
+    <canvas id="stage" tabindex="0" role="application" aria-label="日本 3D 地圖。方向鍵旋轉、加減號縮放、Esc 返回"></canvas>
+    <div class="boot" id="boot" role="status"><span class="boot-seal" aria-hidden="true">日</span>正在準備 3D 地圖…</div>
+    <div class="boot-error" id="boot-error" role="alert" hidden>
+      <b>無法顯示 3D 地圖</b>
+      <p id="boot-error-msg"></p>
+      <p>可以重新整理再試一次；若一直無法顯示，請確認瀏覽器已開啟 WebGL 2（硬體加速）。</p>
+      <div class="boot-actions"><button type="button" onclick="location.reload()">重新整理</button></div>
+    </div>
+    <div id="labels" class="labels" aria-hidden="false"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-seal" aria-hidden="true">日</span>
+        <div>
+          <h1>日本 3D 旅遊導覽</h1>
+          <p class="brand-sub">47 都道府縣・點選看地標</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="search" id="search">
+          <input id="search-input" type="search" placeholder="搜尋縣名或景點，例如：清水寺" autocomplete="off" aria-label="搜尋縣名或景點"
+                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="search-results" />
+          <ul id="search-results" class="search-results" role="listbox" aria-label="搜尋結果" hidden></ul>
+        </div>
+        <button type="button" class="round-btn" id="help-btn" aria-label="操作說明">?</button>
+      </div>
+    </header>
+
+    <nav class="regions" id="regions" aria-label="地區"></nav>
+
+    <p class="hint" id="hint">拖曳旋轉・滾輪縮放・點選都道府縣</p>
+    <div class="badge" id="badge" hidden></div>
+
+    <aside class="panel" id="panel" hidden aria-live="polite">
+      <button type="button" class="sheet-handle" id="sheet-handle" aria-label="展開或收合"></button>
+      <button type="button" class="close" id="panel-close" aria-label="返回全日本">×</button>
+      <div id="panel-body"></div>
+    </aside>
+
+    <div class="dock" id="dock">
+      <button type="button" class="dock-btn tool" id="phase-btn"><span class="dock-k">時段</span><span id="phase-label"></span></button>
+      <button type="button" class="dock-btn tool" id="season-btn"><span class="dock-k">季節</span><span id="season-label"></span></button>
+      <button type="button" class="dock-btn stamp" id="stamp-btn"><span class="dock-k">集印</span><span id="stamp-count">0/47</span></button>
+      <button type="button" class="dock-btn route" id="route-btn" aria-pressed="false"><span class="dock-k">路線</span><span class="lbl-long" id="route-label">推薦</span></button>
+      <button type="button" class="dock-btn" id="hub-btn" aria-pressed="true" title="顯示或隱藏機場、車站、港口"><span class="dock-k">交通</span><span id="hub-label">顯示</span></button>
+      <button type="button" class="dock-btn tool" id="demo-btn" aria-pressed="false"><span class="dock-k">日夜</span><span>展示</span></button>
+      <button type="button" class="dock-btn tool" id="pause-btn" aria-pressed="false"><span class="dock-k">動畫</span><span id="pause-label">播放中</span></button>
+      <button type="button" class="dock-btn icon tool" id="move-btn" aria-pressed="false" title="切換：拖曳旋轉／拖曳移動"><span aria-hidden="true">✥</span><span class="sr">移動模式</span></button>
+      <button type="button" class="dock-btn icon more" id="more-btn" aria-expanded="false" aria-controls="dock" title="更多工具"><span aria-hidden="true">⋯</span><span class="sr">更多工具</span></button>
+    </div>
+    <div class="demo-bar" id="demo-bar" role="group" aria-label="日夜展示" hidden>
+      <span class="demo-clock" id="demo-clock" aria-live="off">10:00</span>
+      <button type="button" class="demo-play" id="demo-play" aria-label="暫停日夜展示">❚❚</button>
+      <button type="button" data-h="6.5">清晨</button>
+      <button type="button" data-h="12">白天</button>
+      <button type="button" data-h="17.6">黃昏</button>
+      <button type="button" data-h="22">夜晚</button>
+      <button type="button" class="demo-close" id="demo-close" aria-label="結束日夜展示">結束</button>
+    </div>
+
+    <aside class="sheet" id="stamp-panel" role="dialog" aria-modal="true" aria-labelledby="stamp-title" hidden>
+      <button type="button" class="close" id="stamp-close" aria-label="關閉">×</button>
+      <h2 id="stamp-title">都道府縣集印帳</h2>
+      <p class="sheet-lead" id="stamp-lead">點開一個縣，就會蓋上它的朱印。</p>
+      <p class="sheet-note">集印代表在這個網站裡逛過該縣，不代表實際去過。</p>
+      <div class="stamp-grid" id="stamp-grid"></div>
+    </aside>
+
+    <aside class="sheet" id="help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+      <button type="button" class="close" id="help-close" aria-label="關閉">×</button>
+      <h2 id="help-title">怎麼操作</h2>
+      <ul class="help-list">
+        <li><b>旋轉</b>滑鼠左鍵拖曳；手機單指拖曳</li>
+        <li><b>移動</b>滑鼠右鍵拖曳，或按右下「✥」切換成單指移動</li>
+        <li><b>縮放</b>滾輪；手機雙指開合</li>
+        <li><b>看地標</b>點一個縣，地標模型會在真實位置立起來；點模型、編號或卡片看景點詳情，按「‹ 回到…」回到清單</li>
+        <li><b>季節活動</b>左下（手機在下方）選月份，地圖會立起當月的祭典、花火、雪祭、滑雪場、櫻花與紅葉的立體模型；點模型看介紹</li>
+        <li><b>交通</b>按右下「交通」顯示或隱藏主要機場、車站與港口的模型；點模型或縣面板裡的「交通樞紐」看連接的路線</li>
+        <li><b>推薦路線</b>按右下「路線」選一條行程，地圖會依站序連起每一站並標上編號；按「播放旅程」可看旅程標記一站一站走完（弧線只表示順序，不是實際交通路線）</li>
+        <li><b>鍵盤</b>先按 Tab 讓地圖取得焦點，方向鍵旋轉、Shift＋方向鍵移動、＋／－縮放</li>
+        <li><b>日夜展示</b>按「日夜 展示」看一天的光線變化，可暫停或跳到清晨、白天、黃昏、夜晚（手機在「⋯」裡）</li>
+        <li><b>動畫</b>按「動畫」可暫停雲、船、海浪與模型動畫；系統設定減少動態效果時會自動停止</li>
+        <li><b>返回</b>按 Esc、點海面，或按面板右上的 ×</li>
+      </ul>
+      <p class="sheet-lead">地標是用程式組出來的示意模型，不是實際比例。天氣是 Open-Meteo 的目前三日預報，不會隨選的月份或日夜展示改變。熱門順序是本站的編輯排序。活動日期為往年慣例，花期與部分祭典每年不同，出發前請查當年公告。</p>
+    </aside>
+
+    <section class="fallback" id="fallback" hidden>
+      <h2>都道府縣一覽</h2>
+      <p class="fallback-note" id="fallback-note">你的瀏覽器不支援 WebGL 2，改用清單顯示。</p>
+      <div id="fallback-list"></div>
+    </section>
+
+    <!-- 左下: 月份列と出典。上から積む -->
+    <div class="corner">
+      <button type="button" class="month-sum" id="month-sum" hidden></button>
+      <div class="months" id="months" role="group" aria-label="季節活動：選月份">
+        <span class="months-k" aria-hidden="true">活動</span>
+      </div>
+      <footer class="credit">
+        地圖：geoBoundaries（© OpenStreetMap contributors, ODbL）｜天氣：<a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>（CC BY 4.0）｜地標為程式生成的示意模型｜<a href="./THIRD-PARTY-NOTICES.txt" target="_blank" rel="noopener">開源授權</a>
+      </footer>
+    </div>
+
+  </body>
+</html>
